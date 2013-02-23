@@ -273,12 +273,12 @@ HlslLinker::~HlslLinker()
 
 
 
-bool HlslLinker::getArgumentData2( const std::string &name, const std::string &semantic, EGlslSymbolType type,
+bool HlslLinker::getArgumentData2( GlslSymbolOrStructMemberBase const* symOrStructMember,
 								 EClassifier c, std::string &outName, std::string &ctor, int &pad, int semanticOffset, ETargetVersion targetVersion)
 {
 	int size;
 	EGlslSymbolType base = EgstVoid;
-	EAttribSemantic sem = parseAttributeSemantic( semantic );
+	EAttribSemantic sem = parseAttributeSemantic( symOrStructMember->semantic );
 
 	// Offset the semantic for the case of an array
 	sem = static_cast<EAttribSemantic>( (int)sem + semanticOffset );
@@ -289,14 +289,14 @@ bool HlslLinker::getArgumentData2( const std::string &name, const std::string &s
 	pad = 0;
 
 	//compute the # of elements in the type
-	switch (type)
+	switch (symOrStructMember->type)
 	{
 	case EgstBool:
 	case EgstBool2:
 	case EgstBool3:
 	case EgstBool4:
 		base = EgstBool;
-		size = type - EgstBool + 1;
+		size = symOrStructMember->type - EgstBool + 1;
 		break;
 
 	case EgstInt:
@@ -304,7 +304,7 @@ bool HlslLinker::getArgumentData2( const std::string &name, const std::string &s
 	case EgstInt3:
 	case EgstInt4:
 		base = EgstInt;
-		size = type - EgstInt + 1;
+		size = symOrStructMember->type - EgstInt + 1;
 		break;
 
 	case EgstFloat:
@@ -312,7 +312,7 @@ bool HlslLinker::getArgumentData2( const std::string &name, const std::string &s
 	case EgstFloat3:
 	case EgstFloat4:
 		base = EgstFloat;
-		size = type - EgstFloat + 1;
+		size = symOrStructMember->type - EgstFloat + 1;
 		break;
 
     default:
@@ -346,7 +346,7 @@ bool HlslLinker::getArgumentData2( const std::string &name, const std::string &s
 				{
 					//handle the blind data
 					outName = "xlat_attrib_";
-					outName += semantic;
+					outName += symOrStructMember->semantic;
 				}
 			}
 			break;
@@ -356,7 +356,7 @@ bool HlslLinker::getArgumentData2( const std::string &name, const std::string &s
 			if ( (bUserVaryings && sem != EAttrSemPosition && sem != EAttrSemPrimitiveID) || varOutString[sem][0] == 0 )
 			{
 				outName = kUserVaryingPrefix;
-				outName += semantic;
+				outName += symOrStructMember->semantic;
 				// If an array element, add the semantic offset to the name
 				if ( semanticOffset != 0 )
 				{
@@ -380,7 +380,7 @@ bool HlslLinker::getArgumentData2( const std::string &name, const std::string &s
 			if ( (bUserVaryings && sem != EAttrSemVPos && sem != EAttrSemVFace && sem != EAttrSemPrimitiveID) || varInString[sem][0] == 0 )
 			{
 				outName = kUserVaryingPrefix;
-				outName += stripSemanticModifier (semantic, false);
+				outName += stripSemanticModifier (symOrStructMember->semantic, false);
 				// If an array element, add the semantic offset to the name
 				if ( semanticOffset != 0 )
 				{
@@ -419,8 +419,11 @@ bool HlslLinker::getArgumentData2( const std::string &name, const std::string &s
 	{
 		//these should always match exactly
 		outName = "xlu_";
-		outName += name;
+		outName += symOrStructMember->name;
 	}
+
+	if (symOrStructMember->outputSuppressed())
+		outName = "";
 
 	return true;
 }
@@ -429,11 +432,7 @@ bool HlslLinker::getArgumentData2( const std::string &name, const std::string &s
 bool HlslLinker::getArgumentData( GlslSymbol* sym, EClassifier c, std::string &outName,
 								 std::string &ctor, int &pad, ETargetVersion targetVersion)
 {
-	const std::string &name = sym->getName();
-	const std::string &semantic = sym->getSemantic();
-	EGlslSymbolType type = sym->getType();
-
-	return getArgumentData2( name, semantic, type, c, outName, ctor, pad, 0, targetVersion);
+	return getArgumentData2( sym, c, outName, ctor, pad, 0, targetVersion);
 }
 
 
@@ -915,9 +914,10 @@ void HlslLinker::emitInputStructParam(GlslSymbol* sym, EShLanguage lang, Extensi
 		std::string name, ctor;
 		for (int idx = 0; idx < arraySize; ++idx)
 		{
+			if (current.outputSuppressed())
+				continue;
 			int pad;
-			if (!getArgumentData2 (current.name, current.semantic, current.type,
-								  lang==EShLangVertex ? EClassAttrib : EClassVarIn, name, ctor, pad, idx, targetVersion))
+			if (!getArgumentData2 (&current, lang==EShLangVertex ? EClassAttrib : EClassVarIn, name, ctor, pad, idx, targetVersion))
 			{
 				//should deal with fall through cases here
 				assert(0);
@@ -1011,7 +1011,7 @@ void HlslLinker::emitOutputStructParam(GlslSymbol* sym, EShLanguage lang, bool u
 		std::string name, ctor;
 		int pad;
 		
-		if (!getArgumentData2( current.name, current.semantic, current.type, lang==EShLangVertex ? EClassVarOut : EClassRes, name, ctor, pad, 0, targetVersion))
+		if (!getArgumentData2( sym, lang==EShLangVertex ? EClassVarOut : EClassRes, name, ctor, pad, 0, targetVersion))
 		{
 			//should deal with fall through cases here
 			assert(0);
@@ -1087,7 +1087,7 @@ bool HlslLinker::emitReturnStruct(GlslStruct *retStruct, std::string parentName,
 
 		for (int idx = 0; idx < arraySize; ++idx)
 		{
-			if (!getArgumentData2( current.name, current.semantic, current.type, lang==EShLangVertex ? EClassVarOut : EClassRes, name, ctor, pad, idx, targetVersion))
+			if (!getArgumentData2( &current, lang==EShLangVertex ? EClassVarOut : EClassRes, name, ctor, pad, idx, targetVersion))
 			{
 				GlslStruct *subStruct = current.structType;
 				if (subStruct)
@@ -1147,8 +1147,9 @@ bool HlslLinker::emitReturnValue(const EGlslSymbolType retType, GlslFunction* fu
 	{
 		std::string name, ctor;
 		int pad;
-		
-		if (!getArgumentData2("", funcMain->getSemantic(), retType, lang==EShLangVertex ? EClassVarOut : EClassRes,
+		GlslSymbolOrStructMemberBase fakedMainSym("", funcMain->getSemantic(), retType, EbpMedium, 0);
+
+		if (!getArgumentData2(&fakedMainSym, lang==EShLangVertex ? EClassVarOut : EClassRes,
 							  name, ctor, pad, 0, targetVersion))
 		{
 			assert(0);
@@ -1178,6 +1179,58 @@ bool HlslLinker::emitReturnValue(const EGlslSymbolType retType, GlslFunction* fu
 	return true;
 }
 
+// Called recursively and appends (to list) any symbols that have semantic sem.
+void HlslLinker::appendDuplicatedSemantics(GlslSymbolOrStructMemberBase* sym, std::string const& sem, std::vector<GlslSymbolOrStructMemberBase*>& list)
+{
+	if (!_stricmp(sym->getSemantic().c_str(), sem.c_str()))
+		list.push_back(sym);
+	else if (sym->getStruct())
+	{
+		int mc = sym->getStruct()->memberCount();
+		for (int i = 0; i < mc; ++i)
+			appendDuplicatedSemantics(const_cast<GlslStruct::StructMember*>(&sym->getStruct()->getMember(i)),sem,list);
+	}
+}
+
+// For each re-used semantic (e.g. TEXCOORD0) record the symbol for which it is output.
+// This is so that you can specify the same semantic in multiple structures without
+// having multiply defined attribute or varying symbols in the output. The one that is
+// output is the one found with the largest dimension.
+extern int getElements( EGlslSymbolType t );
+void HlslLinker::markDuplicatedSemantics(GlslFunction* func)
+{
+	int pCount = func->getParameterCount();
+	for (int asi=0; asi < sizeof(kAttributeSemantic)/sizeof(kAttributeSemantic[0]); ++asi)
+	{
+		std::vector<GlslSymbolOrStructMemberBase*> symsUsingSem;
+		AttrSemanticMapping* sem = &kAttributeSemantic[asi];
+		for (int ii=0; ii<pCount; ii++)
+		{
+			GlslSymbol *sym = func->getParameter(ii);
+			appendDuplicatedSemantics(sym, sem->name, symsUsingSem);
+		}
+		if (symsUsingSem.size() > 1)
+		{
+			int index_of_largest = -1;
+			int largest_array_size = 0;
+			for (unsigned int ii=0; ii < symsUsingSem.size(); ii++)
+			{
+				if (!ii || largest_array_size < getElements(symsUsingSem[ii]->type))
+				{
+					index_of_largest = ii;
+					largest_array_size = getElements(symsUsingSem[ii]->type);
+				}
+			}
+			for (unsigned int ii=0; ii < symsUsingSem.size(); ii++)
+			{
+				if (ii != index_of_largest)
+				{
+					symsUsingSem[ii]->suppressOutput();
+				}
+			}
+		}
+	}
+}
 
 bool HlslLinker::link(HlslCrossCompiler* compiler, const char* entryFunc, ETargetVersion targetVersion, unsigned options)
 {
@@ -1227,6 +1280,8 @@ bool HlslLinker::link(HlslCrossCompiler* compiler, const char* entryFunc, ETarge
 	std::stringstream postamble;
 	std::stringstream varying;
 	std::stringstream call;
+
+	markDuplicatedSemantics(funcMain);
 
 	// Declare return value
 	const EGlslSymbolType retType = funcMain->getReturnType();

@@ -7,28 +7,9 @@
 #include <float.h>
 
 
-// Check against names that are keywords in GLSL, but not HLSL
-static bool IsReservedGlslKeyword (const std::string& name)
-{
-	if ((name == "input") ||
-        (name == "output") ||
-		(name == "varying") ||
-		(name == "attribute"))
-	{
-		return true;
-	}
-	
-	return false;
-}
-
-
-GlslSymbol::GlslSymbol( const std::string &n, const std::string &s, int id, EGlslSymbolType t, TPrecision prec, EGlslQualifier q, int as ) :
-   semantic(s),
+GlslSymbol::GlslSymbol( const std::string &n, const std::string &s, int id, EGlslSymbolType t, TPrecision prec, EGlslQualifier q, int as ) : GlslSymbolOrStructMemberBase(n, s, t, prec, as),
    identifier(id),
-   type(t),
-   precision(prec),
    qual(q),
-   arraySize(as),
    mangleCounter(0),
    structPtr(0),
    isParameter(false),
@@ -37,10 +18,6 @@ GlslSymbol::GlslSymbol( const std::string &n, const std::string &s, int id, EGls
 	if (IsReservedGlslKeyword(n))
 	{
 		name = "xlat_var_" + n;
-	}
-	else
-	{
-		name = n;
 	}
 	mangledName = name;
 
