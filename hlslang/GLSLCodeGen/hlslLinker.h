@@ -58,9 +58,9 @@ private:
 	
 	bool addCalledFunctions( GlslFunction *func, FunctionSet& funcSet, std::vector<GlslFunction*> &funcList);
 	bool getArgumentData2( const std::string &name, const std::string &semantic, EGlslSymbolType type,
-							   EClassifier c, std::string &outName, std::string &ctor, int &pad, int semanticOffset);
+							   EClassifier c, std::string &outName, std::string &ctor, int &pad, int semanticOffset, ETargetVersion targetVersion);
 	bool getArgumentData( GlslSymbol* sym, EClassifier c, std::string &outName,
-				  std::string &ctor, int &pad);
+				  std::string &ctor, int &pad, ETargetVersion targetVersion);
 	void addRequiredExtensions(EAttribSemantic sem, ExtensionSet& extensions);
 	
 	bool linkerSanityCheck(HlslCrossCompiler* compiler, const char* entryFunc);
@@ -72,13 +72,13 @@ private:
 	void emitStructs(HlslCrossCompiler* comp);
 	void emitGlobals(const GlslFunction* globalFunction, const std::vector<GlslSymbol*>& constants);
 	
-	void emitInputNonStructParam(GlslSymbol* sym, EShLanguage lang, bool usePrecision, EAttribSemantic attrSem, std::stringstream& attrib, std::stringstream& varying, std::stringstream& preamble, std::stringstream& call);
-	void emitInputStructParam(GlslSymbol* sym, EShLanguage lang, ExtensionSet& extensions, std::stringstream& attrib, std::stringstream& varying, std::stringstream& preamble, std::stringstream& call);
-	void emitOutputNonStructParam(GlslSymbol* sym, EShLanguage lang, bool usePrecision, EAttribSemantic attrSem, std::stringstream& varying, std::stringstream& preamble, std::stringstream& postamble, std::stringstream& call);
-	void emitOutputStructParam(GlslSymbol* sym, EShLanguage lang, bool usePrecision, EAttribSemantic attrSem, std::stringstream& varying, std::stringstream& preamble, std::stringstream& postamble, std::stringstream& call);
+	void emitInputNonStructParam(GlslSymbol* sym, EShLanguage lang, bool usePrecision, EAttribSemantic attrSem, std::stringstream& attrib, std::stringstream& varying, std::stringstream& preamble, std::stringstream& call, ETargetVersion targetVersion);
+	void emitInputStructParam(GlslSymbol* sym, EShLanguage lang, ExtensionSet& extensions, std::stringstream& attrib, std::stringstream& varying, std::stringstream& preamble, std::stringstream& call, ETargetVersion targetVersion);
+	void emitOutputNonStructParam(GlslSymbol* sym, EShLanguage lang, bool usePrecision, EAttribSemantic attrSem, std::stringstream& varying, std::stringstream& preamble, std::stringstream& postamble, std::stringstream& call, ETargetVersion targetVersion);
+	void emitOutputStructParam(GlslSymbol* sym, EShLanguage lang, bool usePrecision, EAttribSemantic attrSem, std::stringstream& varying, std::stringstream& preamble, std::stringstream& postamble, std::stringstream& call, ETargetVersion targetVersion);
 	void emitMainStart(const HlslCrossCompiler* compiler, const EGlslSymbolType retType, GlslFunction* funcMain, ETargetVersion version, unsigned options, bool usePrecision, std::stringstream& preamble);
-	bool emitReturnValue(const EGlslSymbolType retType, GlslFunction* funcMain, EShLanguage lang, std::stringstream& varying, std::stringstream& postamble);
-	bool emitReturnStruct(GlslStruct* retStruct, std::string parentName, EShLanguage lang, std::stringstream& varying, std::stringstream& postamble);
+	bool emitReturnValue(const EGlslSymbolType retType, GlslFunction* funcMain, EShLanguage lang, std::stringstream& varying, std::stringstream& postamble, ETargetVersion targetVersion);
+	bool emitReturnStruct(GlslStruct* retStruct, std::string parentName, EShLanguage lang, std::stringstream& varying, std::stringstream& postamble, ETargetVersion targetVersion);
 
 private:
 	TInfoSink& infoSink;

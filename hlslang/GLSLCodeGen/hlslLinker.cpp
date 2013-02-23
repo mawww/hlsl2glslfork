@@ -274,7 +274,7 @@ HlslLinker::~HlslLinker()
 
 
 bool HlslLinker::getArgumentData2( const std::string &name, const std::string &semantic, EGlslSymbolType type,
-								 EClassifier c, std::string &outName, std::string &ctor, int &pad, int semanticOffset)
+								 EClassifier c, std::string &outName, std::string &ctor, int &pad, int semanticOffset, ETargetVersion targetVersion)
 {
 	int size;
 	EGlslSymbolType base = EgstVoid;
@@ -332,14 +332,14 @@ bool HlslLinker::getArgumentData2( const std::string &name, const std::string &s
 
 		case EClassAttrib:
 			// If the user has specified a user attrib name, use a user attribute
-			if ( userAttribString[sem][0] != '\0')
+			if ( userAttribString[sem][0] != '\0' && usesBuiltinAttribStrings(targetVersion) )
 			{
 				outName = userAttribString[sem];
 			}
 			// Otherwise, use the built-in attribute name
 			else
 			{
-				outName = attribString[sem];
+				outName = usesBuiltinAttribStrings(targetVersion) ? attribString[sem] : "\0";
 				if (sem == EAttrSemNormal && size == 4)
 					pad = 1;
 				else if ( sem == EAttrSemUnknown || outName[0] == '\0' )
@@ -427,13 +427,13 @@ bool HlslLinker::getArgumentData2( const std::string &name, const std::string &s
 
 
 bool HlslLinker::getArgumentData( GlslSymbol* sym, EClassifier c, std::string &outName,
-								 std::string &ctor, int &pad)
+								 std::string &ctor, int &pad, ETargetVersion targetVersion)
 {
 	const std::string &name = sym->getName();
 	const std::string &semantic = sym->getSemantic();
 	EGlslSymbolType type = sym->getType();
 
-	return getArgumentData2( name, semantic, type, c, outName, ctor, pad, 0);
+	return getArgumentData2( name, semantic, type, c, outName, ctor, pad, 0, targetVersion);
 }
 
 
@@ -843,12 +843,12 @@ static void emitSingleInputVariable (EShLanguage lang, const std::string& name, 
 }
 	
 
-void HlslLinker::emitInputNonStructParam(GlslSymbol* sym, EShLanguage lang, bool usePrecision, EAttribSemantic attrSem, std::stringstream& attrib, std::stringstream& varying, std::stringstream& preamble, std::stringstream& call)
+void HlslLinker::emitInputNonStructParam(GlslSymbol* sym, EShLanguage lang, bool usePrecision, EAttribSemantic attrSem, std::stringstream& attrib, std::stringstream& varying, std::stringstream& preamble, std::stringstream& call, ETargetVersion targetVersion)
 {
 	std::string name, ctor;
 	int pad;
 	
-	if (!getArgumentData (sym, lang==EShLangVertex ? EClassAttrib : EClassVarIn, name, ctor, pad))
+	if (!getArgumentData (sym, lang==EShLangVertex ? EClassAttrib : EClassVarIn, name, ctor, pad, targetVersion))
 	{
 		// should deal with fall through cases here
 		assert(0);
@@ -883,7 +883,7 @@ void HlslLinker::emitInputNonStructParam(GlslSymbol* sym, EShLanguage lang, bool
 }
 
 
-void HlslLinker::emitInputStructParam(GlslSymbol* sym, EShLanguage lang, ExtensionSet& extensions, std::stringstream& attrib, std::stringstream& varying, std::stringstream& preamble, std::stringstream& call)
+void HlslLinker::emitInputStructParam(GlslSymbol* sym, EShLanguage lang, ExtensionSet& extensions, std::stringstream& attrib, std::stringstream& varying, std::stringstream& preamble, std::stringstream& call, ETargetVersion targetVersion)
 {
 	GlslStruct* str = sym->getStruct();
 	assert(str);
@@ -917,7 +917,7 @@ void HlslLinker::emitInputStructParam(GlslSymbol* sym, EShLanguage lang, Extensi
 		{
 			int pad;
 			if (!getArgumentData2 (current.name, current.semantic, current.type,
-								  lang==EShLangVertex ? EClassAttrib : EClassVarIn, name, ctor, pad, idx))
+								  lang==EShLangVertex ? EClassAttrib : EClassVarIn, name, ctor, pad, idx, targetVersion))
 			{
 				//should deal with fall through cases here
 				assert(0);
@@ -952,12 +952,12 @@ void HlslLinker::emitInputStructParam(GlslSymbol* sym, EShLanguage lang, Extensi
 }
 
 
-void HlslLinker::emitOutputNonStructParam(GlslSymbol* sym, EShLanguage lang, bool usePrecision, EAttribSemantic attrSem, std::stringstream& varying, std::stringstream& preamble, std::stringstream& postamble, std::stringstream& call)
+void HlslLinker::emitOutputNonStructParam(GlslSymbol* sym, EShLanguage lang, bool usePrecision, EAttribSemantic attrSem, std::stringstream& varying, std::stringstream& preamble, std::stringstream& postamble, std::stringstream& call, ETargetVersion targetVersion)
 {
 	std::string name, ctor;
 	int pad;
 	
-	if (!getArgumentData( sym, lang==EShLangVertex ? EClassVarOut : EClassRes, name, ctor, pad))
+	if (!getArgumentData( sym, lang==EShLangVertex ? EClassVarOut : EClassRes, name, ctor, pad, targetVersion))
 	{
 		//should deal with fall through cases here
 		assert(0);
@@ -987,7 +987,7 @@ void HlslLinker::emitOutputNonStructParam(GlslSymbol* sym, EShLanguage lang, boo
 }
 
 
-void HlslLinker::emitOutputStructParam(GlslSymbol* sym, EShLanguage lang, bool usePrecision, EAttribSemantic attrSem, std::stringstream& varying, std::stringstream& preamble, std::stringstream& postamble, std::stringstream& call)
+void HlslLinker::emitOutputStructParam(GlslSymbol* sym, EShLanguage lang, bool usePrecision, EAttribSemantic attrSem, std::stringstream& varying, std::stringstream& preamble, std::stringstream& postamble, std::stringstream& call, ETargetVersion targetVersion)
 {
 	//structs must pass the struct, then process per element
 	GlslStruct *Struct = sym->getStruct();
@@ -1011,7 +1011,7 @@ void HlslLinker::emitOutputStructParam(GlslSymbol* sym, EShLanguage lang, bool u
 		std::string name, ctor;
 		int pad;
 		
-		if (!getArgumentData2( current.name, current.semantic, current.type, lang==EShLangVertex ? EClassVarOut : EClassRes, name, ctor, pad, 0))
+		if (!getArgumentData2( current.name, current.semantic, current.type, lang==EShLangVertex ? EClassVarOut : EClassRes, name, ctor, pad, 0, targetVersion))
 		{
 			//should deal with fall through cases here
 			assert(0);
@@ -1064,7 +1064,7 @@ void HlslLinker::emitMainStart(const HlslCrossCompiler* compiler, const EGlslSym
 }
 
 // This function calls itself recursively if it finds structs in structs.
-bool HlslLinker::emitReturnStruct(GlslStruct *retStruct, std::string parentName, EShLanguage lang, std::stringstream& varying, std::stringstream& postamble)
+bool HlslLinker::emitReturnStruct(GlslStruct *retStruct, std::string parentName, EShLanguage lang, std::stringstream& varying, std::stringstream& postamble, ETargetVersion targetVersion)
 {
 	const int elem = retStruct->memberCount();
 	for (int ii=0; ii<elem; ii++)
@@ -1087,12 +1087,12 @@ bool HlslLinker::emitReturnStruct(GlslStruct *retStruct, std::string parentName,
 
 		for (int idx = 0; idx < arraySize; ++idx)
 		{
-			if (!getArgumentData2( current.name, current.semantic, current.type, lang==EShLangVertex ? EClassVarOut : EClassRes, name, ctor, pad, idx))
+			if (!getArgumentData2( current.name, current.semantic, current.type, lang==EShLangVertex ? EClassVarOut : EClassRes, name, ctor, pad, idx, targetVersion))
 			{
 				GlslStruct *subStruct = current.structType;
 				if (subStruct)
 				{
-					if (!emitReturnStruct(current.structType, parentName+current.name+std::string("."), lang, varying, postamble))
+					if (!emitReturnStruct(current.structType, parentName+current.name+std::string("."), lang, varying, postamble, targetVersion))
 					{
 						return false;
 					}
@@ -1128,7 +1128,7 @@ bool HlslLinker::emitReturnStruct(GlslStruct *retStruct, std::string parentName,
 	return true;
 }
 
-bool HlslLinker::emitReturnValue(const EGlslSymbolType retType, GlslFunction* funcMain, EShLanguage lang, std::stringstream& varying, std::stringstream& postamble)
+bool HlslLinker::emitReturnValue(const EGlslSymbolType retType, GlslFunction* funcMain, EShLanguage lang, std::stringstream& varying, std::stringstream& postamble, ETargetVersion targetVersion)
 {
 	// void return type
 	if (retType == EgstVoid)
@@ -1149,7 +1149,7 @@ bool HlslLinker::emitReturnValue(const EGlslSymbolType retType, GlslFunction* fu
 		int pad;
 		
 		if (!getArgumentData2("", funcMain->getSemantic(), retType, lang==EShLangVertex ? EClassVarOut : EClassRes,
-							  name, ctor, pad, 0))
+							  name, ctor, pad, 0, targetVersion))
 		{
 			assert(0);
 			infoSink.info << (lang==EShLangVertex ? "Unsupported type for shader return value (" : "Unsupported return type for shader entry function (");
@@ -1173,7 +1173,7 @@ bool HlslLinker::emitReturnValue(const EGlslSymbolType retType, GlslFunction* fu
 	assert (retType == EgstStruct);
 	GlslStruct *retStruct = funcMain->getStruct();
 	assert (retStruct);
-	return emitReturnStruct(retStruct, std::string("xl_retval."), lang, varying, postamble);
+	return emitReturnStruct(retStruct, std::string("xl_retval."), lang, varying, postamble, targetVersion);
 
 	return true;
 }
@@ -1258,11 +1258,11 @@ bool HlslLinker::link(HlslCrossCompiler* compiler, const char* entryFunc, ETarge
 		case EqtConst:
 			if (sym->getType() != EgstStruct)
 			{
-				emitInputNonStructParam(sym, lang, usePrecision, attrSem, attrib, varying, preamble, call);
+				emitInputNonStructParam(sym, lang, usePrecision, attrSem, attrib, varying, preamble, call, targetVersion);
 			}
 			else
 			{
-				emitInputStructParam(sym, lang, extensions, attrib, varying, preamble, call);
+				emitInputStructParam(sym, lang, extensions, attrib, varying, preamble, call, targetVersion);
 			}
 
 			// NOTE: for "inout" parameters need to fallthrough to the next case
@@ -1277,11 +1277,11 @@ bool HlslLinker::link(HlslCrossCompiler* compiler, const char* entryFunc, ETarge
 
 			if ( sym->getType() != EgstStruct)
 			{
-				emitOutputNonStructParam(sym, lang, usePrecision, attrSem, varying, preamble, postamble, call);
+				emitOutputNonStructParam(sym, lang, usePrecision, attrSem, varying, preamble, postamble, call, targetVersion);
 			}
 			else
 			{
-				emitOutputStructParam(sym, lang, usePrecision, attrSem, varying, preamble, postamble, call);
+				emitOutputStructParam(sym, lang, usePrecision, attrSem, varying, preamble, postamble, call, targetVersion);
 			}
 			break;
 
@@ -1306,7 +1306,7 @@ bool HlslLinker::link(HlslCrossCompiler* compiler, const char* entryFunc, ETarge
 
 
 	// Entry point return value
-	if (!emitReturnValue(retType, funcMain, lang, varying, postamble))
+	if (!emitReturnValue(retType, funcMain, lang, varying, postamble, targetVersion))
 		return false;
 
 	postamble << "}\n\n";
