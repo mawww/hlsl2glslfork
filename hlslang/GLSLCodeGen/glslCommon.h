@@ -60,9 +60,52 @@ enum EGlslQualifier
    EqtInOut
 };
 
+// Check against names that are keywords in GLSL, but not HLSL
+static bool IsReservedGlslKeyword (const std::string& name)
+{
+	if ((name == "input") ||
+		(name == "output") ||
+		(name == "varying") ||
+		(name == "attribute"))
+	{
+		return true;
+	}
+
+	return false;
+}
 
 // Forward Declarations
 class GlslStruct;
+
+// Contains everything that is shared between
+// GlslSymbol and GlslStruct::StructMember
+// ...
+class GlslSymbolOrStructMemberBase
+{
+public:
+	GlslSymbolOrStructMemberBase::GlslSymbolOrStructMemberBase(const std::string &n, const std::string &s, EGlslSymbolType t, TPrecision prec, int as) :
+	semantic(s),
+	type(t),
+	precision(prec),
+	arraySize(as),
+	outputIsSuppressed(false),
+	name(n)
+	{
+	}
+	bool isArray() const { return (arraySize > 0); }
+	int getArraySize() const { return arraySize; }
+	const std::string &getSemantic() const { return semantic; }
+	virtual GlslStruct* getStruct() { return 0; }
+	void suppressOutput() { outputIsSuppressed = true; }
+	bool outputSuppressed() const { return outputIsSuppressed; }
+public:
+	std::string name;
+	std::string semantic;
+	EGlslSymbolType type;
+	TPrecision precision;
+	int arraySize;
+	bool outputIsSuppressed;
+};
 
 /// Outputs the type of the symbol to the output buffer
 void writeType(std::stringstream &out, EGlslSymbolType type, GlslStruct *s, TPrecision precision);

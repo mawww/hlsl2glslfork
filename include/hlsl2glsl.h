@@ -162,6 +162,11 @@ enum ETargetVersion
 	ETargetVersionCount
 };
 
+// Later non-ES targets should also return false for this.
+inline bool usesBuiltinAttribStrings(ETargetVersion targetVersion)
+{
+	return (targetVersion == ETargetGLSL_ES_100) ? false : true;
+}
 
 /// Translation options
 enum TTranslateOptions
